@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "imoonlab-pathodataforge"
+version = "0.1.0"
+description = "Hospital-oriented WSI preprocessing and patch dataset builder."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "iMoonLab-PathoDataForge Contributors" }]
+dependencies = [
+    "PySide6>=6.5",
+    "opencv-python>=4.8",
+    "numpy>=1.23",
+    "Pillow>=10.0",
+    "pandas>=2.0",
+    "openpyxl>=3.1",
+    "PyYAML>=6.0",
+    "tifffile>=2023.0",
+    "openslide-python>=1.3",
+    "torch>=2.0",
+    "timm>=0.9.11",
+    "huggingface_hub>=0.23",
+]
+
+[project.scripts]
+pathodataforge = "pathodataforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pathodataforge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "test"]
+pythonpath = ["."]

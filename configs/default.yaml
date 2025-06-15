@@ -1,0 +1,63 @@
+input:
+  wsi_dir: ""
+  metadata_file: ""
+  output_dir: "./PathoDataForge_output"
+
+metadata:
+  case_id_column: ""
+  label_column: ""
+  filename_column: ""
+
+patch:
+  patch_size: 512
+  stride: 512
+  level: 0
+  max_patches_per_slide: 2000
+  sampling_mode: dense
+  num_sample: 2000
+  max_trials: 100000
+  min_fg_ratio: 0.25
+  use_bg_mask: true
+
+quality:
+  tissue_threshold: 0.5
+  blur_threshold: 80.0
+  brightness_min: 30
+  brightness_max: 230
+
+split:
+  train: 0.7
+  val: 0.15
+  test: 0.15
+  seed: 42
+
+coordinates:
+  enable: true
+  format: range_level0
+
+visualization:
+  save_overlay: true
+  display_overlay: true
+  downsample: 32
+  outline_rgb: [37, 99, 235]
+  outline_width: 1
+  style: points
+  show_tissue_mask: true
+  max_box_count: 350
+  jpeg_quality: 90
+
+features:
+  enable: true
+  model_name: ResNet50
+  batch_size: 32
+  num_workers: 0
+  device: auto
+  precision: auto
+  hf_token: ""
+  overwrite: false
+
+runtime:
+  cpu_workers: 1
+  gpu_workers: 1
+  queue_maxsize: 8
+  target_files: []
