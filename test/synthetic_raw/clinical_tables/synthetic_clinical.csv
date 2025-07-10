@@ -1,0 +1,5 @@
+real_patient_id,patient_name,gender,age,birth_date,phone,id_card,hospital_id,case_id,pathology_id,specimen_id,block_id,slide_id,wsi_filename,diagnosis,tumor_site,stain_type,scan_date,survival_time,label,doctor_id,annotation_file
+P001,Synthetic Alpha,F,67,1959-02-14,13000000001,ID000000000001,HOSP001,CASE001,PATH001,SPEC001,BLOCK001,SLIDE001,P001_slide_001.svs,Adenocarcinoma,Lung,H&E,2026-01-15,24,tumor,DOC001,P001_slide_001.json
+P001,Synthetic Alpha,F,67,1959-02-14,13000000001,ID000000000001,HOSP001,CASE001,PATH001,SPEC001,BLOCK002,SLIDE002,P001_slide_002.svs,Adenocarcinoma,Lung,H&E,2026-01-16,24,tumor,DOC001,P001_slide_002.json
+P002,Synthetic Beta,M,52,1974-06-20,13000000002,ID000000000002,HOSP002,CASE002,PATH002,SPEC002,BLOCK001,SLIDE001,P002_slide_001.ndpi,Squamous carcinoma,Lung,IHC,2026-02-03,18,tumor,DOC002,P002_slide_001.json
+P003,Synthetic Gamma,F,38,1988-11-02,13000000003,ID000000000003,HOSP003,CASE003,PATH003,SPEC003,BLOCK001,SLIDE001,P003_slide_001.tiff,Benign tissue,Breast,H&E,2026-03-11,36,benign,DOC003,P003_slide_001.json
