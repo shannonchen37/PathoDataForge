@@ -1,0 +1,104 @@
+name: Build Release Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS
+            archive: iMoonLab-PathoDataForge-macOS.zip
+          - os: ubuntu-latest
+            label: Linux
+            archive: iMoonLab-PathoDataForge-Linux.tar.gz
+          - os: windows-latest
+            label: Windows
+            archive: iMoonLab-PathoDataForge-Windows.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openslide-tools
+
+      - name: Install native dependencies
+        if: runner.os == 'macOS'
+        run: brew install openslide
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Build app
+        env:
+          PYINSTALLER_CONFIG_DIR: .pyinstaller_cache
+          MPLCONFIGDIR: .matplotlib_cache
+        run: >
+          pyinstaller
+          --clean
+          --noconfirm
+          --windowed
+          --onedir
+          --name iMoonLab-PathoDataForge
+          --collect-submodules pathodataforge
+          main.py
+
+      - name: Archive macOS artifact
+        if: runner.os == 'macOS'
+        run: |
+          if [ -d "dist/iMoonLab-PathoDataForge.app" ]; then
+            ditto -c -k --keepParent dist/iMoonLab-PathoDataForge.app ${{ matrix.archive }}
+          else
+            ditto -c -k --keepParent dist/iMoonLab-PathoDataForge ${{ matrix.archive }}
+          fi
+
+      - name: Archive Linux artifact
+        if: runner.os == 'Linux'
+        run: tar -czf ${{ matrix.archive }} -C dist iMoonLab-PathoDataForge
+
+      - name: Archive Windows artifact
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/iMoonLab-PathoDataForge -DestinationPath ${{ matrix.archive }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
