@@ -89,6 +89,19 @@ python -m pathodataforge.cli --config configs/default.yaml
 
 `configs/default.yaml` 保留 PRD 中的空输入模板。若已经运行过 demo 生成脚本，CLI 会在默认输入为空时自动使用 `demo_data/wsi` 和 `demo_data/metadata.csv`。
 
+## 技术实现细节
+
+iMoonLab-PathoDataForge 将 GUI、WSI 读取、patch 采样、特征提取和脱敏索引拆分为相对独立的模块，GUI 只负责参数输入、状态展示和后台任务调度，核心处理逻辑仍由 pipeline 执行，便于后续接入医院本地系统或实验室批处理流程。
+
+- 桌面端使用 PySide6 构建，主窗口采用统一 `AppState` 管理 WSI 路径、metadata、字段映射、参数、硬件状态、运行状态和输出文件。
+- WSI 读取优先使用 OpenSlide，支持 `.svs`、`.ndpi`、`.mrxs`、`.tif/.tiff` 等常见病理图格式；普通 PNG/JPEG/TIFF 可降级到 Pillow 读取，便于 demo 和轻量验证。
+- WSI 预览支持缩略图浏览、鼠标滚轮缩放、拖拽平移和医生绿色画笔标注；放大时会重新读取当前视野区域，避免直接放大缩略图导致模糊。
+- 背景过滤在缩略图上生成 tissue mask，再把候选 patch 映射回 level 0 坐标；dense 模式输出去背景后的全部无重叠组织候选，随机采样则从这些候选中抽样。
+- patch 坐标以 level 0 的 `[x0, y0, x1, y1]` 范围为主格式，同时输出中心点字段，方便后续 MIL、空间可视化和病理区域回溯。
+- 特征提取默认提供 ResNet50 baseline，预留 UNI、UNI2-h、CONCH、Virchow2 等病理 foundation model 接口；特征 `.npy` 与坐标 `.npy` 一一对应，并支持缓存复用。
+- 运行流程采用后台 worker，GUI 日志和进度实时刷新，避免大图处理期间界面冻结。
+- 多维脱敏索引使用 HMAC-SHA256 生成稳定匿名 ID，并将公开 manifest 与医院本地私有映射表分离，支持患者、病例、样本、蜡块、切片、WSI、patch 和医生标注的多层级对齐。
+
 ## 输出目录
 
 默认输出到 `PathoDataForge_output/`：
@@ -189,16 +202,6 @@ privacy_index/
 
 `manifest.csv` 是可交付文件，包含匿名 ID、匿名 WSI 路径、文件格式、checksum、诊断、标签、部位、染色类型、年龄段、扫描月份和标注引用等字段。`private_id_mapping.csv` 是医院本地追溯表，包含真实患者 ID、病例 ID、病理号和匿名 ID 的对应关系，不能外发。
 
-### GitHub 发布注意
-
-仓库 `.gitignore` 已忽略 `PRD.md`、`ID.md`、`WSI/`、`PathoDataForge_output*/`、`demo_data/`、`test/synthetic_processed/`、私有映射表、密钥、模型权重和日志文件。发布前请确认真实 WSI、输出结果、密钥、mapping 和 private 文件没有被加入 Git。
-
-`test/` 目录提供完整合成数据和自动化测试：
-
-```bash
-python -m pytest test
-```
-
 ## Patch Manifest 字段
 
 `metadata/patch_manifest.csv` 包含：
@@ -281,70 +284,9 @@ ResNet50 使用 `torchvision` 加载。UNI、UNI2-h、Virchow2 使用 `timm` 从
 
 特征输出到 `features/*_fts.npy`。每个 `.npy` 的第 0 维与对应 `*_coors.npy` 的坐标行一一对应。若 `.npy` 已存在且可读取、行数匹配，程序会直接复用缓存；损坏的 `.npy` 会重命名为 `.broken` 并重新计算。
 
-开发环境可以用命令行下载并做单图前向测试：
-
-```bash
-python scripts/download_and_test_models.py --models ResNet50 UNI UNI2-h CONCH Virchow2 --device auto
-```
-
-也可以单独测试某个模型：
-
-```bash
-python scripts/download_and_test_models.py --models ResNet50 --device mps
-```
-
-脚本会触发 Hugging Face 下载，使用 demo 图做一次 smoke test，并把特征保存到 `PathoDataForge_output/model_smoke/`。
-
-## Release 构建
-
-仓库提供 `.github/workflows/release.yml` 自动构建发布包。推送 `v*` tag 或在 GitHub Actions 手动运行 workflow 后，会分别在 macOS、Linux、Windows runner 上运行测试并生成：
-
-- `iMoonLab-PathoDataForge-macOS.zip`
-- `iMoonLab-PathoDataForge-Linux.tar.gz`
-- `iMoonLab-PathoDataForge-Windows.zip`
-
-当 workflow 由 tag 触发时，这些文件会自动上传到 GitHub Release。由于 PyInstaller 不支持可靠跨平台交叉编译，建议使用 GitHub Actions 或分别在三类系统上本机构建。
-
-macOS / Linux 本机构建示例：
-
-```bash
-PYINSTALLER_CONFIG_DIR=.pyinstaller_cache \
-MPLCONFIGDIR=.matplotlib_cache \
-pyinstaller --clean --noconfirm --windowed --onedir \
-  --name iMoonLab-PathoDataForge \
-  --collect-submodules pathodataforge \
-  main.py
-```
-
-构建产物位于 `dist/`，发布归档建议放在 `release/`。这些目录已在 `.gitignore` 中忽略。
-
-## Windows 打包
-
-PowerShell:
-
-```powershell
-.\scripts\build_windows_exe.ps1
-```
-
-等价 PyInstaller 命令：
-
-```bash
-pyinstaller --noconsole --onefile --name iMoonLab-PathoDataForge main.py
-```
-
-输出文件位于 `dist/iMoonLab-PathoDataForge.exe`。
-
-## 测试
-
-```bash
-pytest
-```
-
 ## 注意事项
 
 - patch 提取按窗口逐块读取，不会一次性把整张 WSI 载入内存。
 - 真实 WSI 的倍率选择会优先读取 OpenSlide objective power；普通图片 fallback 默认按 40x 基准估算。
 - dense 模式会输出全部组织候选 patch；`max_patches_per_slide` 只限制 `random_tissue` 和 `top_quality` 模式。
 - 未匹配 metadata 的 WSI 会保留在 `metadata_cleaned.csv` 中，状态为 `unmatched`，标签为空。
-
-说明：本项目开发整理时间范围为 2025-06-15 至 2025-07-30，后整理并开源至 GitHub。
